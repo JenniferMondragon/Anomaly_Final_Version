@@ -63,6 +63,9 @@
     <ClInclude Include="..\stdc++.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\vector3d.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="core.frag">
@@ -109,5 +112,16 @@
     <ClCompile Include="..\AStar.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vector3d.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="print.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Test.mp3">
+      <Filter>Source Files</Filter>
+    </Media>
   </ItemGroup>
 </Project>

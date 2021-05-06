@@ -138,7 +138,6 @@ public:
         return this->front;
     }
 
-
 private:
     // Camera Attributes
     glm::vec3 position;

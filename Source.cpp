@@ -1,7 +1,6 @@
 //
-//  main.cpp
+//  Source.cpp
 //  
-
 
 #include <iostream>
 #include <cmath>
@@ -11,28 +10,25 @@
 #define GLEW_STATIC
 #include <glew.h>
 
-
 // GLFW
 #include <glfw3.h>
 #include <glew.h>
-
 
 // GLM Mathematics
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
 
-//react physics
-//#include <reactphysics3d/reactphysics3d.h>
-
 // Other includes
 #include "Shader.h"
 #include "Camera.h"
 
-//react physics namespace
-//using namespace reactphysics3d;
+// physics - Jennifer
+#include <btBulletDynamicsCommon.h>
+#include <vector>
+//#include <vector3d.cpp>
 
-//imGUI includes
+//imGUI includes - Jennifer
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -41,11 +37,31 @@
 #include "GL/glut.h"
 #include <gl/GL.h>
 
+// Audio Engine - Jennifer
+#include <irrKlang.h>
+using namespace irrklang;
+
+// free draw - Jennifer
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+
 // Function prototypes
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 void DoMovement();
 void drawStuff();
+double randDouble();
+float randFloat();
+GLint randGLint();
+/*  Printing convenience (print.c) */
+void printv(va_list args, const char* format);
+void print(const char* format, ...);
+void printAt(int x, int y, const char* format, ...);
+void errCheck(char* where);
+
 //void drawFree(int xOffset, int yOffset, GLFWwindow* window);
 
 // Window dimensions
@@ -66,10 +82,117 @@ glm::vec3 lightPos(-2.0f, 2.0f, 3.0f);
 GLfloat deltaTime = 0.0f;    // Time between current frame and last frame
 GLfloat lastFrame = 0.0f;      // Time of last frame
 
-//**************** P H Y S I C S   S T U F F********************//
-//PhysicsCommon physicsCommon;
-// Create a physics world 
-//PhysicsWorld* world = physicsCommon.createPhysicsWorld();
+// ***********************P H Y S I C S******************************//
+/*GLUquadricObj* quad;
+btDynamicsWorld* world;	
+btDispatcher* dispatcher;	
+btCollisionConfiguration* collisionConfig;	
+btBroadphaseInterface* broadphase;	
+btConstraintSolver* solver;					
+std::vector<btRigidBody*> bodies;
+
+btRigidBody* addSphere(float rad, float x, float y, float z, float mass)
+{
+    btTransform t;	//position and rotation
+    t.setIdentity();
+    t.setOrigin(btVector3(x, y, z));	//put it to x,y,z coordinates
+    btSphereShape* sphere = new btSphereShape(rad);	//it's a sphere, so use sphereshape
+    btVector3 inertia(0, 0, 0);	//inertia is 0,0,0 for static object, else
+    if (mass != 0.0)
+        sphere->calculateLocalInertia(mass, inertia);	//it can be determined by this function (for all kind of shapes)
+
+    btMotionState* motion = new btDefaultMotionState(t);	//set the position (and motion)
+    btRigidBody::btRigidBodyConstructionInfo info(mass, motion, sphere, inertia);	//create the constructioninfo, you can create multiple bodies with the same info
+    btRigidBody* body = new btRigidBody(info);	//let's create the body itself
+    world->addRigidBody(body);	//and let the world know about it
+    bodies.push_back(body);	//to be easier to clean, I store them a vector
+    return body;
+}
+
+void renderSphere(btRigidBody* sphere)
+{
+    if (sphere->getCollisionShape()->getShapeType() != SPHERE_SHAPE_PROXYTYPE)	//only render, if it's a sphere
+        return;
+    glColor3f(1, 0, 0);
+    float r = ((btSphereShape*)sphere->getCollisionShape())->getRadius();
+    btTransform t;
+    sphere->getMotionState()->getWorldTransform(t);	//get the transform
+    float mat[16];
+    t.getOpenGLMatrix(mat);	//OpenGL matrix stores the rotation and orientation
+    glPushMatrix();
+    glMultMatrixf(mat);	//multiplying the current matrix with it moves the object in place
+    gluSphere(quad, r, 20, 20);
+    glPopMatrix();
+}
+
+void renderPlane(btRigidBody* plane)
+{
+    if (plane->getCollisionShape()->getShapeType() != STATIC_PLANE_PROXYTYPE)
+        return;
+    glColor3f(0.8, 0.8, 0.8);
+    btTransform t;
+    plane->getMotionState()->getWorldTransform(t);
+    float mat[16];
+    t.getOpenGLMatrix(mat);
+    glPushMatrix();
+    glMultMatrixf(mat);	//translation,rotation
+    glBegin(GL_QUADS);
+    glVertex3f(-1000, 0, 1000);
+    glVertex3f(-1000, 0, -1000);
+    glVertex3f(1000, 0, -1000);
+    glVertex3f(1000, 0, 1000);
+    glEnd();
+    glPopMatrix();
+}
+
+void init(float angle)
+{
+    //pretty much initialize everything logically
+    collisionConfig = new btDefaultCollisionConfiguration();
+    dispatcher = new btCollisionDispatcher(collisionConfig);
+    broadphase = new btDbvtBroadphase();
+    solver = new btSequentialImpulseConstraintSolver();
+    world = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfig);
+    world->setGravity(btVector3(0, -10, 0));	//gravity on Earth
+
+    //similar to createSphere
+    btTransform t;
+    t.setIdentity();
+    t.setOrigin(btVector3(0, 0, 0));
+    btStaticPlaneShape* plane = new btStaticPlaneShape(btVector3(0, 1, 0), 0);
+    btMotionState* motion = new btDefaultMotionState(t);
+    btRigidBody::btRigidBodyConstructionInfo info(0.0, motion, plane);
+    btRigidBody* body = new btRigidBody(info);
+    world->addRigidBody(body);
+    bodies.push_back(body);
+
+    addSphere(1.0, 0, 20, 0, 1.0);	//add a new sphere above the ground 
+
+    glClearColor(0, 0, 0, 1);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(angle, 640.0 / 480.0, 1, 1000);
+    glMatrixMode(GL_MODELVIEW);
+    quad = gluNewQuadric();
+    //initskybox();
+    glEnable(GL_DEPTH_TEST);
+}
+
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+    //drawSkybox(50);
+    //camera.UpdateCameraVectors();
+    for (int i = 0; i < bodies.size(); i++)
+    {
+        if (bodies[i]->getCollisionShape()->getShapeType() == STATIC_PLANE_PROXYTYPE)
+            renderPlane(bodies[i]);
+        else if (bodies[i]->getCollisionShape()->getShapeType() == SPHERE_SHAPE_PROXYTYPE)
+            renderSphere(bodies[i]);
+    }
+}
+*/
 
 // Moves/alters the camera positions based on user input
 void DoMovement()
@@ -812,7 +935,7 @@ void drawRandomPoly()
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
     glDrawArrays(GL_TRIANGLES, 0, 24);
     glBindVertexArray(0);
-}
+} 
 
 void pickRandomPoly()
 {
@@ -820,7 +943,17 @@ void pickRandomPoly()
     int num = range * (rand() / (RAND_MAX + 1.0));
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glColor3f(1.0f, 0.5f, 1.0f);
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    double aspect = (double)viewport[2] / (double)viewport[3];
+    gluPerspective(60, aspect, 1, 100);
+
+    glMatrixMode(GL_MODELVIEW);
+
+    glColor3ub(255, 0, 255);
 
     switch (num)
     {   
@@ -871,6 +1004,65 @@ void pickRandomPoly()
     }
 }
 
+//GLUT
+void reshape(int w, int h)
+{
+    glViewport(0, 0, w, h);
+}
+
+// Attempting to free draw - Jennifer
+int th = 0;  /* azimuth of view angle */
+int ph = 0;  /* elevation of view angle */
+
+void drawValues()
+{
+    glColor3f(1.0, 1.0, 1.0);
+    printAt(5, 5, "View Angle (th, ph) =(%d, %d)", th, ph);
+}
+
+void drawAxes()
+{
+    double len = 2.0;
+    glColor3f(1.0, 1.0, 1.0);
+    glBegin(GL_LINES);
+    glVertex3d(0, 0, 0);
+    glVertex3d(len, 0, 0);
+    glVertex3d(0, 0, 0);
+    glVertex3d(0, len, 0);
+    glVertex3d(0, 0, 0);
+    glVertex3d(0, 0, len);
+    glEnd();
+
+    // create the labels
+    glRasterPos3d(len, 0, 0);
+    print("x");
+    glRasterPos3d(0, len, 0);
+    print("y");
+    glRasterPos3d(0, 0, len);
+    print("z");
+}
+
+void display()
+{
+    /*  Clear the image */
+    glClear(GL_COLOR_BUFFER_BIT);
+    /*  Reset previous transforms */
+    glLoadIdentity();
+
+    /*  Set View Angle */
+    glRotated(ph, 1, 0, 0);
+    glRotated(th, 0, 1, 0);
+
+    /*  Draw  */
+    drawAxes();
+    drawValues();
+    pickRandomPoly();
+
+    /*  Flush and swap */
+    glFlush();
+    glutSwapBuffers();
+}
+
 // The MAIN function, from here we start the application and run the game loop
 // 
 int main(int argc, char** argv)
@@ -878,6 +1070,17 @@ int main(int argc, char** argv)
      // Init GLFW
     glfwInit();
     glutInit(&argc, argv); 
+
+    //setting up the sound engine - Jennifer
+    ISoundEngine* engine = createIrrKlangDevice();
+
+    if (!engine)
+    {
+        return 0;
+    }
+
+    // This is going to play just some background music to show the linkage of the sound engine library
+    engine->play2D("Test.mp3",true);
 
     // Set all the required options for GLFW
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -933,7 +1136,6 @@ int main(int argc, char** argv)
 
     // Setting Up GLUT - Jennifer
     glutInitDisplayMode(GLUT_DOUBLE);
-   
 
     /***end***** I N I T I A L I Z E ***********/
 
@@ -971,15 +1173,31 @@ int main(int argc, char** argv)
         {
             static float f = 0.0f;
             static int counter = 0;
+            static ik_f32 fx= 0.5f;
 
-            ImGui::Begin("Game Editor");                          
+            ImGui::Begin("Game Editor"); 
+
+            // allows user to adjust volume - Jennifer
+            ImGui::SliderFloat("Set Volume", &fx, 0.0f, 1.0f);
+            engine->setSoundVolume(fx);
 
             ImGui::SliderFloat("Translation", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             //ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
+            if (ImGui::Button("Display Axes"))
+            {
+                //drawAxes();
+            }
+
             if (ImGui::Button("Add Random Object"))
             { 
-                glutPostOverlayRedisplay();
+                
+                // Tried Physics Here
+                //btRigidBody* sphere = addSphere(1.0, 1.0, 1.0, 0.0, 1.0);
+                //vector3d look = camera.GetPosition() * 20.0f;
+                //sphere->setLinearVelocity(btVector3(look.x, look.y, look.z));
+
+                //display();
             }
 
             //if (ImGui::Button("Add Object"))               // DOES NOT WORK
